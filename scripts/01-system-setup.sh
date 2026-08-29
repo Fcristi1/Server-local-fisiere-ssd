@@ -21,7 +21,7 @@ apt-get -y install \
   avahi-daemon
 
 log "Enabling and starting smartd (disk health monitoring)..."
-systemctl enable --now smartmontools.service
+systemctl enable --now smartmontools.service || warn "smartmontools.service failed to start (non-fatal) - check 'sudo journalctl -xeu smartmontools.service' later. Disk health checks are optional and won't block the NAS setup."
 
 log "Enabling avahi-daemon so the Pi is reachable as raspberrypi.local..."
 systemctl enable --now avahi-daemon
