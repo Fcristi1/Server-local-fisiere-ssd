@@ -29,7 +29,6 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
-RemainAfterExit=yes
 # ntfs-3g/exfat forks a background FUSE daemon after mounting - without KillMode=none,
 # systemd reaps that lingering process shortly after this oneshot unit finishes,
 # silently unmounting the drive a moment later.
@@ -54,7 +53,8 @@ log "Reloading udev rules and systemd..."
 udevadm control --reload-rules
 systemctl daemon-reload
 
-log "Clearing any stale failed/rate-limited automount service instances..."
+log "Clearing any stale/stuck automount service instances (oneshot units left 'active' block reused device names from re-mounting)..."
+systemctl stop 'nas-automount@*' 2>/dev/null || true
 systemctl reset-failed 'nas-automount@*' 2>/dev/null || true
 udevadm trigger --action=add --subsystem-match=block
 
