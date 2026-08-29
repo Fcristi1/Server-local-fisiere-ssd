@@ -32,6 +32,10 @@ EOF
 log "Installing udev rule..."
 cat > "$RULE_DEST" <<'EOF'
 # Auto-mount/share any partition plugged in or removed on a USB SSD/HDD/stick.
+# Tell udisks2 (used by desktop file managers) to ignore these partitions entirely,
+# so it doesn't race us to auto-mount them under /media/<user>/... first - NTFS/exFAT
+# exclusively lock the device, so whichever mounts first blocks the other.
+SUBSYSTEM=="block", KERNEL=="sd[a-z][0-9]*", ENV{UDISKS_IGNORE}="1"
 # Hands off to a systemd service instead of mounting inline: systemd-udevd's worker
 # processes run in a restricted sandbox that blocks FUSE (ntfs-3g/exfat) mounts.
 SUBSYSTEM=="block", KERNEL=="sd[a-z][0-9]*", ACTION=="add", RUN+="/bin/systemctl --no-block start nas-automount@add-%k.service"
