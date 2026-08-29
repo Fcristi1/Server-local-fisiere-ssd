@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Configures Samba to share every drive mounted under /srv/nas and restarts the service.
+# One-time bootstrap: wires /etc/samba/nas-shares.conf into smb.conf and (re)generates
+# it from whatever is currently under /srv/nas. After this, 02-prepare-disk.sh and the
+# automount helper (06-install-automount.sh) keep the shares list up to date on their own.
 #
 # Usage: sudo ./04-setup-samba.sh
 set -euo pipefail
@@ -12,7 +14,7 @@ SMB_CONF="/etc/samba/smb.conf"
 SHARES_INCLUDE="/etc/samba/nas-shares.conf"
 BASE_DIR="/srv/nas"
 
-[[ -d "$BASE_DIR" ]] || die "$BASE_DIR does not exist yet. Run 02-prepare-disk.sh first."
+mkdir -p "$BASE_DIR"
 
 if [[ ! -f "${SMB_CONF}.orig" ]]; then
   log "Backing up original smb.conf to ${SMB_CONF}.orig..."
@@ -25,23 +27,7 @@ if ! grep -q "include = $SHARES_INCLUDE" "$SMB_CONF"; then
 fi
 
 log "Generating $SHARES_INCLUDE from directories under $BASE_DIR..."
-{
-  for dir in "$BASE_DIR"/*/; do
-    [[ -d "$dir" ]] || continue
-    name="$(basename "$dir")"
-    cat <<EOF
-
-[$name]
-   path = $dir
-   valid users = @users
-   read only = no
-   browsable = yes
-   guest ok = no
-   create mask = 0664
-   directory mask = 2775
-EOF
-  done
-} > "$SHARES_INCLUDE"
+regenerate_samba_shares
 
 log "Testing Samba configuration..."
 testparm -s >/dev/null
@@ -53,5 +39,5 @@ systemctl enable smbd nmbd
 log "Opening firewall for Samba (if ufw is active)..."
 ufw allow samba >/dev/null 2>&1 || true
 
-log "Samba shares configured for: $(ls "$BASE_DIR")"
+log "Samba shares configured for: $(ls "$BASE_DIR" 2>/dev/null || echo '(none yet)')"
 log "Connect from your phone/PC using \\\\$(hostname -I | awk '{print $1}')\\<share-name> or smb://$(hostname -I | awk '{print $1}')/<share-name>"

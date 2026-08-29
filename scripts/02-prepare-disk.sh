@@ -98,5 +98,10 @@ if [[ "$FSTYPE" == "ext4" || "$FSTYPE" == "ext3" || "$FSTYPE" == "ext2" ]]; then
   chmod -R 2775 "$MOUNT_POINT"
 fi
 
+if [[ -f /etc/samba/nas-shares.conf ]]; then
+  log "Refreshing Samba shares..."
+  regenerate_samba_shares
+fi
+
 log "Drive mounted at $MOUNT_POINT (UUID=$UUID, fstype=$FSTYPE)."
 

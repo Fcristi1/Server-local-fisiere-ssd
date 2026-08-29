@@ -6,6 +6,12 @@ Android apps like **CX File Explorer**.
 
 No RAID — each drive is mounted and shared independently.
 
+> 🔒 **Safety guarantee**: nothing here ever formats or erases a drive automatically.
+> Only running `02-prepare-disk.sh` with the explicit `--format` flag (and typing `y`
+> to confirm) wipes data. Plugging in a drive just mounts whatever filesystem is
+> already on it, read-write, so you can freely add/modify/delete files from CX File
+> Explorer without anything on the Pi side touching the drive on its own.
+
 ## Hardware checklist
 
 - Raspberry Pi 5 (2GB+ RAM recommended)
@@ -92,16 +98,37 @@ sudo ./scripts/03-manage-nas-users.sh remove --username nasuser2
 
 Add one user per person/device if you want separate logins — they all share the same drives.
 
-## 6. Share the drives over Samba
+## 6. Share the drives over Samba (one-time bootstrap)
 
 ```bash
 sudo ./scripts/04-setup-samba.sh
 ```
 
-Every folder under `/srv/nas` (one per drive from step 4) becomes an SMB share
-named after its label, accessible only to the `nasuser` account.
+Wires `/etc/samba/nas-shares.conf` into `smb.conf` and generates a share for every
+folder currently under `/srv/nas`. You only need to run this once — after this,
+`02-prepare-disk.sh` and the auto-mount helper (next step) keep the shares list
+up to date on their own whenever a drive is added or removed.
 
-## 7. (Recommended) Lock down the firewall
+## 7. Enable plug-and-play auto-mount (recommended)
+
+```bash
+sudo ./scripts/06-install-automount.sh
+```
+
+Installs a udev rule + helper script so that from now on:
+
+- Plugging in **any already-formatted** SSD/HDD/USB stick automatically mounts it
+  under `/srv/nas/<label>` (using its filesystem label, or the device name if it
+  has none) and adds/refreshes its Samba share — no commands needed.
+- Unplugging it cleanly unmounts it and removes its share, without touching the
+  data on the drive itself.
+- **Brand-new/blank drives are left untouched** (nothing is auto-formatted) — you
+  still do one manual `02-prepare-disk.sh --device ... --label ... --format` per
+  new drive the first time, exactly like step 4.
+
+Check `/var/log/nas-automount.log` on the Pi if a plugged-in drive doesn't show up.
+
+## 8. (Recommended) Lock down the firewall
 
 ```bash
 sudo ./scripts/05-firewall.sh
@@ -157,8 +184,8 @@ The same credentials work from Windows (`\\<pi-ip>\ssd1`), macOS/Linux
 
 ## Adding a drive later
 
-Just repeat steps 4 and 6 (`02-prepare-disk.sh` for the new drive, then re-run
-`04-setup-samba.sh` to pick up the new share).
+- **Already-formatted drive** (with `06-install-automount.sh` installed): just plug it in — it's mounted and shared automatically within a few seconds.
+- **Brand-new/blank drive**: run `02-prepare-disk.sh --device ... --label ... --format` once (step 4); the share appears immediately, no need to touch `04-setup-samba.sh` again.
 
 ## Checking disk health
 

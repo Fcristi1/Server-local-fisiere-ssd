@@ -16,3 +16,31 @@ confirm() {
   read -r -p "$prompt [y/N] " reply
   [[ "$reply" =~ ^[Yy]$ ]]
 }
+
+# Rebuilds /etc/samba/nas-shares.conf from every directory under /srv/nas and
+# reloads smbd so the change takes effect without dropping active connections.
+regenerate_samba_shares() {
+  local base_dir="/srv/nas"
+  local shares_include="/etc/samba/nas-shares.conf"
+
+  [[ -d "$base_dir" ]] || return 0
+  : > "$shares_include"
+  for dir in "$base_dir"/*/; do
+    [[ -d "$dir" ]] || continue
+    local name
+    name="$(basename "$dir")"
+    cat >> "$shares_include" <<EOF
+
+[$name]
+   path = $dir
+   valid users = @users
+   read only = no
+   browsable = yes
+   guest ok = no
+   create mask = 0664
+   directory mask = 2775
+EOF
+  done
+  smbcontrol smbd reload-config 2>/dev/null || systemctl reload smbd 2>/dev/null || true
+}
+
