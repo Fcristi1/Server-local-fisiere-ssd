@@ -26,6 +26,11 @@ After=local-fs.target
 
 [Service]
 Type=oneshot
+RemainAfterExit=yes
+# ntfs-3g/exfat forks a background FUSE daemon after mounting - without KillMode=none,
+# systemd reaps that lingering process shortly after this oneshot unit finishes,
+# silently unmounting the drive a moment later.
+KillMode=none
 ExecStart=/usr/local/bin/nas-automount.sh %i
 EOF
 
