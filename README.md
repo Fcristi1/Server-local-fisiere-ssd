@@ -68,15 +68,29 @@ Repeat for each additional drive with a different `--label` (e.g. `hdd1`, `backu
 
 > ⚠️ `--format` is destructive. The script prints the disk info and asks for confirmation first — double-check the device path before confirming.
 
-## 5. Create the NAS user
+## 5. Create NAS users and passwords
 
-This is the login used from your phone/PC:
+Users and passwords are set entirely on the Pi with `03-manage-nas-users.sh` — no
+external tools needed. Everyone in the `users` group can access every share.
 
 ```bash
-sudo ./scripts/03-create-nas-user.sh --username nasuser
+# Create a user, prompted for a password interactively (recommended)
+sudo ./scripts/03-manage-nas-users.sh add --username nasuser
+
+# Or set the password non-interactively (ends up in shell history, use with care)
+sudo ./scripts/03-manage-nas-users.sh add --username nasuser2 --password 'MyStrongPass1'
+
+# Change a password later
+sudo ./scripts/03-manage-nas-users.sh passwd --username nasuser
+
+# List existing NAS users
+sudo ./scripts/03-manage-nas-users.sh list
+
+# Remove a user
+sudo ./scripts/03-manage-nas-users.sh remove --username nasuser2
 ```
 
-You'll be prompted to set a Samba password — remember it for step 7.
+Add one user per person/device if you want separate logins — they all share the same drives.
 
 ## 6. Share the drives over Samba
 
@@ -113,7 +127,7 @@ the same way, since it just shows up as another block device.
    This erases the stick and mounts it at `/srv/nas/test`.
 3. Create the NAS user (skip if already done) and generate the Samba share:
    ```bash
-   sudo ./scripts/03-create-nas-user.sh --username nasuser
+   sudo ./scripts/03-manage-nas-users.sh add --username nasuser
    sudo ./scripts/04-setup-samba.sh
    ```
 4. Connect from CX File Explorer (see below) and confirm you can see the `test`
