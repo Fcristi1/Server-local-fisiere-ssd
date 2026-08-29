@@ -23,6 +23,9 @@ cat > "$SERVICE_DEST" <<'EOF'
 [Unit]
 Description=NAS automount for %i
 After=local-fs.target
+# Device names (sda1, sdb1, ...) get reused when drives are swapped, which can otherwise
+# trip systemd's start-rate-limit for this instance name and block future mounts.
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
@@ -50,6 +53,9 @@ EOF
 log "Reloading udev rules and systemd..."
 udevadm control --reload-rules
 systemctl daemon-reload
+
+log "Clearing any stale failed/rate-limited automount service instances..."
+systemctl reset-failed 'nas-automount@*' 2>/dev/null || true
 udevadm trigger --action=add --subsystem-match=block
 
 log "Done. Plug in any already-formatted SSD/HDD/USB stick and it will appear"
