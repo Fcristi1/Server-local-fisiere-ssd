@@ -21,7 +21,7 @@ apt-get -y install \
   avahi-daemon
 
 log "Enabling and starting smartd (disk health monitoring)..."
-systemctl enable --now smartmontools.service smartd.service 2>/dev/null || systemctl enable --now smartd.service
+systemctl enable --now smartmontools.service
 
 log "Enabling avahi-daemon so the Pi is reachable as raspberrypi.local..."
 systemctl enable --now avahi-daemon
