@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# One-time bootstrap: wires /etc/samba/nas-shares.conf into smb.conf and (re)generates
-# it from whatever is currently under /srv/nas. After this, 02-prepare-disk.sh and the
-# automount helper (06-install-automount.sh) keep the shares list up to date on their own.
+# One-time bootstrap (safe to re-run): replaces /etc/samba/smb.conf with a clean, minimal
+# config containing ONLY the NAS drive shares from /etc/samba/nas-shares.conf - so no
+# leftover/custom shares (home directories, desktop file-sharing, printers, etc.) can ever
+# expose anything beyond what's currently mounted under /srv/nas.
 #
 # Usage: sudo ./04-setup-samba.sh
 set -euo pipefail
@@ -21,19 +22,21 @@ if [[ ! -f "${SMB_CONF}.orig" ]]; then
   cp "$SMB_CONF" "${SMB_CONF}.orig"
 fi
 
-log "Disabling default printer shares so only NAS drives show up as network shares..."
-if ! grep -q '^\s*load printers = no' "$SMB_CONF"; then
-  sed -i '/^\[global\]/a\   load printers = no\n   printing = bsd\n   printcap name = /dev/null\n   disable spoolss = yes\n   usershare max shares = 0' "$SMB_CONF"
-fi
-if ! grep -q '^\s*usershare max shares = 0' "$SMB_CONF"; then
-  sed -i '/^\[global\]/a\   usershare max shares = 0' "$SMB_CONF"
-fi
-# Remove the [printers]/[print$] share stanzas shipped in the default smb.conf.
-awk '
-  /^\[printers\]/ || /^\[print\$\]/ { skip=1; next }
-  /^\[/ { skip=0 }
-  !skip
-' "$SMB_CONF" > "${SMB_CONF}.tmp" && mv "${SMB_CONF}.tmp" "$SMB_CONF"
+log "Writing a clean smb.conf (drops any pre-existing custom/home/printer shares)..."
+cat > "$SMB_CONF" <<EOF
+[global]
+   workgroup = WORKGROUP
+   server string = Raspberry Pi NAS
+   security = user
+   map to guest = never
+   load printers = no
+   printing = bsd
+   printcap name = /dev/null
+   disable spoolss = yes
+   usershare max shares = 0
+
+   include = $SHARES_INCLUDE
+EOF
 
 # "usershares" (e.g. from the desktop file manager's Sharing tab) can expose folders
 # like the whole filesystem or /home independently of smb.conf - wipe any of those out.
@@ -43,11 +46,6 @@ if [[ -d /var/lib/samba/usershares ]]; then
     warn "Removing existing Samba usershares (desktop file-sharing leftovers): $EXISTING_USERSHARES"
     rm -f /var/lib/samba/usershares/*
   fi
-fi
-
-if ! grep -q "include = $SHARES_INCLUDE" "$SMB_CONF"; then
-  log "Adding include line for $SHARES_INCLUDE to smb.conf..."
-  printf '\n[global]\ninclude = %s\n' "$SHARES_INCLUDE" >> "$SMB_CONF"
 fi
 
 log "Generating $SHARES_INCLUDE from directories under $BASE_DIR..."
