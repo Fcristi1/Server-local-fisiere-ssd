@@ -23,7 +23,10 @@ fi
 
 log "Disabling default printer shares so only NAS drives show up as network shares..."
 if ! grep -q '^\s*load printers = no' "$SMB_CONF"; then
-  sed -i '/^\[global\]/a\   load printers = no\n   printing = bsd\n   printcap name = /dev/null\n   disable spoolss = yes' "$SMB_CONF"
+  sed -i '/^\[global\]/a\   load printers = no\n   printing = bsd\n   printcap name = /dev/null\n   disable spoolss = yes\n   usershare max shares = 0' "$SMB_CONF"
+fi
+if ! grep -q '^\s*usershare max shares = 0' "$SMB_CONF"; then
+  sed -i '/^\[global\]/a\   usershare max shares = 0' "$SMB_CONF"
 fi
 # Remove the [printers]/[print$] share stanzas shipped in the default smb.conf.
 awk '
@@ -31,6 +34,16 @@ awk '
   /^\[/ { skip=0 }
   !skip
 ' "$SMB_CONF" > "${SMB_CONF}.tmp" && mv "${SMB_CONF}.tmp" "$SMB_CONF"
+
+# "usershares" (e.g. from the desktop file manager's Sharing tab) can expose folders
+# like the whole filesystem or /home independently of smb.conf - wipe any of those out.
+if [[ -d /var/lib/samba/usershares ]]; then
+  EXISTING_USERSHARES="$(find /var/lib/samba/usershares -mindepth 1 -maxdepth 1 2>/dev/null)"
+  if [[ -n "$EXISTING_USERSHARES" ]]; then
+    warn "Removing existing Samba usershares (desktop file-sharing leftovers): $EXISTING_USERSHARES"
+    rm -f /var/lib/samba/usershares/*
+  fi
+fi
 
 if ! grep -q "include = $SHARES_INCLUDE" "$SMB_CONF"; then
   log "Adding include line for $SHARES_INCLUDE to smb.conf..."
