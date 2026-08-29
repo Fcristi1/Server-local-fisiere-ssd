@@ -35,6 +35,15 @@ cat > "$SMB_CONF" <<EOF
    disable spoolss = yes
    usershare max shares = 0
 
+   # Performance tuning for USB SSD/HDD transfers over LAN
+   server multi channel support = yes
+   socket options = TCP_NODELAY IPTOS_LOWDELAY SO_RCVBUF=131072 SO_SNDBUF=131072
+   use sendfile = yes
+   min receivefile size = 16384
+   strict allocate = yes
+   read raw = yes
+   write raw = yes
+
    include = $SHARES_INCLUDE
 EOF
 

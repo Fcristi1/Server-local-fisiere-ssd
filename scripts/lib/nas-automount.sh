@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# Called by the udev rule (99-nas-automount.rules) whenever a USB drive is plugged
-# or unplugged. Auto-mounts already-formatted partitions under /srv/nas and keeps
-# the Samba shares in sync — no manual steps needed after a drive has a filesystem.
+# Invoked by systemd (nas-automount@.service), which the udev rule (99-nas-automount.rules)
+# triggers whenever a USB drive is plugged or unplugged. Auto-mounts already-formatted
+# partitions under /srv/nas and keeps the Samba shares in sync — no manual steps needed
+# after a drive has a filesystem. Running via a systemd service (instead of inline in the
+# udev worker) is required for NTFS/exFAT: systemd-udevd's worker sandbox blocks FUSE mounts.
 #
-# Args: $1 = kernel device name (e.g. sda1), ACTION/ID_FS_TYPE/ID_FS_LABEL come from udev env.
+# Args: $1 = "<add|remove>-<kernel device name>", e.g. "add-sda1" or "remove-sda1".
 set -uo pipefail
 
-KNAME="$1"
+INSTANCE="$1"
+ACTION="${INSTANCE%%-*}"
+KNAME="${INSTANCE#*-}"
 DEVNAME="/dev/$KNAME"
-ACTION="${ACTION:-add}"
 BASE_DIR="/srv/nas"
 SHARES_INCLUDE="/etc/samba/nas-shares.conf"
 STATE_DIR="/run/nas-automount"

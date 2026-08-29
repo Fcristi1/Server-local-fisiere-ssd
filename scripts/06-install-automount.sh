@@ -13,19 +13,34 @@ require_root
 HELPER_SRC="$(pwd)/lib/nas-automount.sh"
 HELPER_DEST="/usr/local/bin/nas-automount.sh"
 RULE_DEST="/etc/udev/rules.d/99-nas-automount.rules"
+SERVICE_DEST="/etc/systemd/system/nas-automount@.service"
 
 log "Installing automount helper to $HELPER_DEST..."
 install -m 0755 "$HELPER_SRC" "$HELPER_DEST"
 
+log "Installing systemd service template (runs outside udev's restricted sandbox, needed for NTFS/exFAT FUSE mounts)..."
+cat > "$SERVICE_DEST" <<'EOF'
+[Unit]
+Description=NAS automount for %i
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/nas-automount.sh %i
+EOF
+
 log "Installing udev rule..."
 cat > "$RULE_DEST" <<'EOF'
 # Auto-mount/share any partition plugged in or removed on a USB SSD/HDD/stick.
-SUBSYSTEM=="block", KERNEL=="sd[a-z][0-9]*", ACTION=="add", RUN+="/usr/local/bin/nas-automount.sh %k"
-SUBSYSTEM=="block", KERNEL=="sd[a-z][0-9]*", ACTION=="remove", RUN+="/usr/local/bin/nas-automount.sh %k"
+# Hands off to a systemd service instead of mounting inline: systemd-udevd's worker
+# processes run in a restricted sandbox that blocks FUSE (ntfs-3g/exfat) mounts.
+SUBSYSTEM=="block", KERNEL=="sd[a-z][0-9]*", ACTION=="add", RUN+="/bin/systemctl --no-block start nas-automount@add-%k.service"
+SUBSYSTEM=="block", KERNEL=="sd[a-z][0-9]*", ACTION=="remove", RUN+="/bin/systemctl --no-block start nas-automount@remove-%k.service"
 EOF
 
-log "Reloading udev rules..."
+log "Reloading udev rules and systemd..."
 udevadm control --reload-rules
+systemctl daemon-reload
 udevadm trigger --action=add --subsystem-match=block
 
 log "Done. Plug in any already-formatted SSD/HDD/USB stick and it will appear"
