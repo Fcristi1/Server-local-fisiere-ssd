@@ -39,6 +39,8 @@ regenerate_samba_shares() {
    guest ok = no
    create mask = 0664
    directory mask = 2775
+   veto files = /lost+found/
+   delete veto files = no
 EOF
   done
   smbcontrol smbd reload-config 2>/dev/null || systemctl reload smbd 2>/dev/null || true

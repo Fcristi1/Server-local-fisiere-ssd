@@ -21,6 +21,17 @@ if [[ ! -f "${SMB_CONF}.orig" ]]; then
   cp "$SMB_CONF" "${SMB_CONF}.orig"
 fi
 
+log "Disabling default printer shares so only NAS drives show up as network shares..."
+if ! grep -q '^\s*load printers = no' "$SMB_CONF"; then
+  sed -i '/^\[global\]/a\   load printers = no\n   printing = bsd\n   printcap name = /dev/null\n   disable spoolss = yes' "$SMB_CONF"
+fi
+# Remove the [printers]/[print$] share stanzas shipped in the default smb.conf.
+awk '
+  /^\[printers\]/ || /^\[print\$\]/ { skip=1; next }
+  /^\[/ { skip=0 }
+  !skip
+' "$SMB_CONF" > "${SMB_CONF}.tmp" && mv "${SMB_CONF}.tmp" "$SMB_CONF"
+
 if ! grep -q "include = $SHARES_INCLUDE" "$SMB_CONF"; then
   log "Adding include line for $SHARES_INCLUDE to smb.conf..."
   printf '\n[global]\ninclude = %s\n' "$SHARES_INCLUDE" >> "$SMB_CONF"
