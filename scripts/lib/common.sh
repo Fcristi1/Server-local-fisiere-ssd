@@ -27,6 +27,7 @@ regenerate_samba_shares() {
   : > "$shares_include"
   for dir in "$base_dir"/*/; do
     [[ -d "$dir" ]] || continue
+    mountpoint -q "$dir" || continue
     local name
     name="$(basename "$dir")"
     cat >> "$shares_include" <<EOF

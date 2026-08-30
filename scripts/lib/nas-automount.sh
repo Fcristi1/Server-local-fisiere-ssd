@@ -25,6 +25,7 @@ regenerate_shares() {
   : > "$SHARES_INCLUDE"
   for dir in "$BASE_DIR"/*/; do
     [[ -d "$dir" ]] || continue
+    mountpoint -q "$dir" || continue
     name="$(basename "$dir")"
     cat >> "$SHARES_INCLUDE" <<EOF
 
@@ -51,8 +52,15 @@ if [[ "$ACTION" == "remove" ]]; then
     umount -l "$MOUNT_POINT" 2>/dev/null || true
     rmdir "$MOUNT_POINT" 2>/dev/null || true
     rm -f "$STATE_FILE"
-    regenerate_shares
   fi
+  # Clean up any empty directory left under BASE_DIR when drive was removed
+  for dir in "$BASE_DIR"/*/; do
+    [[ -d "$dir" ]] || continue
+    if ! mountpoint -q "$dir"; then
+      rmdir "$dir" 2>/dev/null || true
+    fi
+  done
+  regenerate_shares
   exit 0
 fi
 
